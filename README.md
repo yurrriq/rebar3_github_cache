@@ -35,10 +35,9 @@ _A `rebar3` plugin enabling brevity and caching for GitHub deps._
 ~/.cache/rebar3/github/{{user}}/{{repo}}-{{tag}}-{{etag}}.tar.gz
 ```
 
-Where `etag` is the `ETag` reported by GitHub in the HTTP response for the
-tarball.
+Where `etag` is reported by GitHub in the HTTP response for the tarball.
 
-N.B. This is **not** an MD5 or SHA checksum of tarball itself.
+N.B. This is **not** an MD5 or SHA checksum of the tarball itself.
 
 
 ## License
