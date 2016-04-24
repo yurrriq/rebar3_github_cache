@@ -10,7 +10,17 @@
 
 -define(GH(Repo), "https://github.com/" ++ Repo).
 
+-type github_resource() :: {github,Repo::string(),{tag,Vsn::string()}}
+                         | {github,Repo,{branch,Branch::string()}}
+                         | {github,Repo,{ref,Ref::string()}}
+                         | {github,Repo}.
 
+-export_type([github_resource/0]).
+
+
+-spec lock(AppDir::file:filename_all(), github_resource()) -> Lock when
+    Lock :: {github,Repo::string(),{tag,Vsn::string()}}
+          | {git,Url::string(),{ref,Ref::string()}}.
 lock(_AppDir, {github,Repo,{tag,Vsn}}) ->
   {github,filename:rootname(Repo, ".git"), {tag,Vsn}};
 lock(AppDir, {github,Repo,Other}) ->
@@ -18,6 +28,7 @@ lock(AppDir, {github,Repo,Other}) ->
 lock(AppDir, {github,Repo}) ->
   rebar_git_resource:lock(AppDir, {git,?GH(Repo)}).
 
+-spec needs_update(Dir::file:filename_all(), github_resource()) -> boolean().
 needs_update(Dir, {github,_Repo,{tag,Vsn}}) ->
   [AppInfo] = rebar_app_discover:find_apps([Dir], all),
   rebar_app_info:original_vsn(AppInfo) =/= ec_cnv:to_list(Vsn);
@@ -26,6 +37,11 @@ needs_update(Dir, {github,Repo,Other}) ->
 needs_update(Dir, {github,Repo}) ->
   rebar_git_resource:needs_update(Dir, {git,?GH(Repo)}).
 
+-spec download(Dir::file:filename_all(), github_resource(), rebar_state:t())
+              -> {ok,true}
+                   | {fetch_fail,Repo::string(),Vsn::string()}
+                   | {failed_extract,TarPath::file:filename_all()}
+                   | {bad_download,TarPath::file:filename_all()}.
 download(Dir, {github,Repo0,{tag,Vsn}}=Dep, State) ->
   Repo1 = filename:rootname(Repo0, ".git"),
   GlobalCacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
@@ -34,7 +50,8 @@ download(Dir, {github,Repo0,{tag,Vsn}}=Dep, State) ->
   CacheDir = filename:join([GlobalCacheDir,"github",User]),
   Archive = Vsn ++ ".tar.gz",
   CachePath = filename:join(CacheDir, Name ++ "-" ++ Vsn),
-  case rebar_utils:url_append_path(?GH(Repo1), filename:join(["archive",Archive])) of
+  ArchivePath = filename:join(["archive",Archive]),
+  case rebar_utils:url_append_path(?GH(Repo1), ArchivePath) of
     {ok,Url} ->
       cached_download(Dir, CachePath, Dep, Url, etag(CachePath), State);
     _ ->
@@ -78,8 +95,10 @@ serve_from_download(TmpDir, CachePath, GitHubDep, ETag, Binary, State) ->
       {bad_download,TarPath}
   end.
 
+-spec tar_path(CachePath::string(), ETag::string()) -> TarPath::string().
 tar_path(CachePath, ETag) -> CachePath ++ "-" ++ ETag ++ ".tar.gz".
 
+-spec extract(string(), string()) -> {ok,true} | {failed_extract,string()}.
 extract(TmpDir, TarPath) ->
   ec_file:mkdir_p(TmpDir),
   ok = erl_tar:extract(TarPath, [{cwd,TmpDir},compressed]),
@@ -93,6 +112,7 @@ extract(TmpDir, TarPath) ->
       {failed_extract,TarPath}
   end.
 
+-spec move_files(TmpDir::string(), Files::[string()]) -> ok | {error,atom()}.
 move_files(TmpDir, [File|Files]) ->
   Dest = filename:join(TmpDir, filename:basename(File)),
   case file:rename(File, Dest) of
@@ -101,11 +121,14 @@ move_files(TmpDir, [File|Files]) ->
   end;
 move_files(_TmpDir, []) -> ok.
 
+-spec make_vsn(file:filename_all()) -> {error,string()}.
 make_vsn(_Dir) -> {error,"Replacing version of type github not supported."}.
 
+-spec request(get | head, Url::string(), ETag::string()) -> Result when
+    Result :: {ok,cached} | {ok,Body::binary(),ETag::string()} | error.
 request(Method, Url, ETag) ->
   case httpc:request(Method, {Url,[{"User-Agent",rebar_utils:user_agent()}]},
-                     [{ssl,rebar_pkg_resource:ssl_opts(Url)}, {relaxed,true}],
+                     [{ssl,rebar_pkg_resource:ssl_opts(Url)},{relaxed,true}],
                      [{body_format,binary}],
                      rebar) of
     {ok,{{_Version,200,_Reason},Headers,Body}} ->
@@ -131,6 +154,7 @@ request(Method, Url, ETag) ->
       error
   end.
 
+-spec etag(CachePath::string()) -> ETag::string() | false.
 etag(CachePath) ->
   case filelib:wildcard(CachePath ++ "*") of
     [Path|_] ->
@@ -139,6 +163,7 @@ etag(CachePath) ->
     []       -> false
   end.
 
+-spec namevsn_etag(TarPath::string()) -> {NameVsn::string(),ETag::string()}.
 namevsn_etag(TarPath) ->
   NameVsnETag = filename:rootname(filename:basename(TarPath), ".tar.gz"),
   ETag = lists:last(string:tokens(NameVsnETag, "-")),
