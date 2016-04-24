@@ -1,0 +1,9 @@
+{application, rebar3_github_cache, [
+  {description,  "Plugin enabling brevity and caching for GitHub deps."},
+  {vsn,          "0.1.0"},
+  {applications, [kernel, stdlib]},
+
+  {maintainers, ["Eric Bailey"]},
+  {licenses,    ["Apache"]},
+  {links,       [{"GitHub", "https://github.com/lfe-rebar3/github-cache"}]}
+]}.

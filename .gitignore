@@ -1,0 +1,4 @@
+_*
+.rebar3
+*.beam
+ebin
