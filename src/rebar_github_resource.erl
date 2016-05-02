@@ -166,5 +166,8 @@ etag(CachePath) ->
 -spec namevsn_etag(TarPath::string()) -> {NameVsn::string(),ETag::string()}.
 namevsn_etag(TarPath) ->
   NameVsnETag = filename:rootname(filename:basename(TarPath), ".tar.gz"),
-  ETag = lists:last(string:tokens(NameVsnETag, "-")),
-  {filename:basename(NameVsnETag, [$-|ETag]),ETag}.
+  Tokens      = string:tokens(NameVsnETag, "-"),
+  ETag        = lists:last(Tokens),
+  Vsn0        = lists:last(lists:droplast(Tokens)),
+  Vsn1        = case Vsn0 of [$v|Rest] -> Rest; _ -> Vsn0 end,
+  {string:join(lists:droplast(lists:droplast(Tokens))++[Vsn1], "-"),ETag}.
