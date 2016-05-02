@@ -31,7 +31,7 @@ lock(AppDir, {github,Repo}) ->
 -spec needs_update(Dir::file:filename_all(), github_resource()) -> boolean().
 needs_update(Dir, {github,_Repo,{tag,Vsn}}) ->
   [AppInfo] = rebar_app_discover:find_apps([Dir], all),
-  rebar_app_info:original_vsn(AppInfo) =/= ec_cnv:to_list(Vsn);
+  rebar_app_info:original_vsn(AppInfo) =/= drop_v(ec_cnv:to_list(Vsn));
 needs_update(Dir, {github,Repo,Other}) ->
   rebar_git_resource:needs_update(Dir, {git,?GH(Repo),Other});
 needs_update(Dir, {github,Repo}) ->
@@ -168,6 +168,8 @@ namevsn_etag(TarPath) ->
   NameVsnETag = filename:rootname(filename:basename(TarPath), ".tar.gz"),
   Tokens      = string:tokens(NameVsnETag, "-"),
   ETag        = lists:last(Tokens),
-  Vsn0        = lists:last(lists:droplast(Tokens)),
-  Vsn1        = case Vsn0 of [$v|Rest] -> Rest; _ -> Vsn0 end,
-  {string:join(lists:droplast(lists:droplast(Tokens))++[Vsn1], "-"),ETag}.
+  Vsn         = drop_v(lists:last(lists:droplast(Tokens))),
+  {string:join(lists:droplast(lists:droplast(Tokens))++[Vsn], "-"),ETag}.
+
+drop_v([$v|Rest]) -> Rest;
+drop_v(Vsn)       -> Vsn.
